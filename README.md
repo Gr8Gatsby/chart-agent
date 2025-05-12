@@ -52,15 +52,39 @@ This project is a minimal agent designed for deployment on Vercel. It utilizes C
     npm install
     ```
 
-2.  **Run in Development Mode:**
-    This command uses `tsup` to build the agent and then starts a local server using `nodemon` (or similar, via `onSuccess` script), enabling live reloading.
+2.  **Run in Development Mode (using `npm run dev`):**
+    This command uses `tsup` to build the agent and then starts a local Node.js server, enabling live reloading on file changes. This is good for quick iteration on your agent's core logic.
     ```bash
     npm run dev
     ```
-    The agent will typically be available at `http://localhost:3001`.
+    The agent will typically be available at `http://localhost:3001` (or the port specified in `src/agent/index.ts`).
     *   A2A Endpoint: `http://localhost:3001/a2a`
     *   Agent Card: `http://localhost:3001/a2a/.well-known/agent.json`
     *   Generated Charts: `http://localhost:3001/charts/<chart-filename>.png`
+
+3.  **Test Locally with Vercel Emulation (using `vercel dev`):**
+    To test your project in an environment that closely emulates Vercel production, including `vercel.json` routing and serverless function behavior:
+    
+    a.  **Install Vercel CLI (if not already installed):**
+        ```bash
+        npm install -g vercel
+        ```
+    b.  **Log in to Vercel:**
+        ```bash
+        vercel login
+        ```
+    c.  **Link your project (if not already linked):**
+        Navigate to your project directory and run:
+        ```bash
+        vercel link
+        ```
+        Follow the prompts to connect to your Vercel project.
+        
+    d.  **Start the local Vercel development server:**
+        ```bash
+        vercel dev
+        ```
+        Vercel CLI will build your project according to `vercel.json` and `package.json` scripts and serve it locally, typically on a port like `http://localhost:3000` (it will tell you the exact port). This is the best way to catch deployment-related issues (like 404s) before pushing to Vercel.
 
 ## Build
 
