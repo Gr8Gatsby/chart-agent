@@ -14,12 +14,10 @@ const __dirname_logic = path.dirname(__filename_logic);
 const projectRootDir_logic = path.resolve(__dirname_logic, '..'); 
 const chartsDir_logic = path.join(projectRootDir_logic, 'public', 'generated_charts');
 const fontsDir_logic = path.join(projectRootDir_logic, 'src', 'assets', 'fonts'); // Path to your fonts directory
-console.log(`[MyAgentLogic Debug] import.meta.url: ${import.meta.url}`);
-console.log(`[MyAgentLogic Debug] __filename_logic: ${__filename_logic}`);
-console.log(`[MyAgentLogic Debug] __dirname_logic: ${__dirname_logic}`);
-console.log(`[MyAgentLogic Debug] projectRootDir_logic: ${projectRootDir_logic}`);
-console.log(`[MyAgentLogic Debug] chartsDir_logic: ${chartsDir_logic}`);
-console.log(`[MyAgentLogic Debug] fontsDir_logic (expected for fonts): ${fontsDir_logic}`);
+console.log('🗺️ Paths configured:');
+console.log(`   📁 Project Root: ${projectRootDir_logic}`);
+console.log(`   🖼️ Charts Output: ${chartsDir_logic}`);
+console.log(`   ✒️ Fonts Directory: ${fontsDir_logic}`);
 // --- End setup ---
 
 // --- Register Custom Fonts ---
@@ -31,29 +29,28 @@ const fontFilesToRegister = [
 ];
 
 let fontsRegistered = 0;
-console.log('[MyAgentLogic] Attempting to register fonts:');
+console.log('🎨 Registering custom fonts...');
 fontFilesToRegister.forEach(fontInfo => {
-  console.log(`[MyAgentLogic] Checking for font at: ${fontInfo.path}`); // Log the exact path being checked
+  console.log(`   ⚙️ Checking for font at: ${fontInfo.path}`); // Log the exact path being checked
   if (fs.existsSync(fontInfo.path)) {
     registerFont(fontInfo.path, { family: customFontFamily, weight: fontInfo.weight });
-    console.log(`[MyAgentLogic] SUCCESS: Registered font: ${fontInfo.path} as ${customFontFamily} (weight: ${fontInfo.weight})`);
+    console.log(`   ✅ Registered: ${path.basename(fontInfo.path)} (${fontInfo.weight})`);
     fontsRegistered++;
   } else {
-    console.warn(`[MyAgentLogic] WARN: Font file NOT FOUND at ${fontInfo.path}.`);
+    console.warn(`   ⚠️ Font not found: ${path.basename(fontInfo.path)} at ${fontInfo.path}`);
   }
 });
 
 if (fontsRegistered > 0) {
   Chart.defaults.font.family = customFontFamily;
   Chart.defaults.font.size = 12;
-  console.log(`[MyAgentLogic] Set Chart.js default font family to: ${customFontFamily}`);
+  console.log(`🖌️ Chart.js default font: ${customFontFamily}`);
 } else {
-  console.warn('[MyAgentLogic] WARN: No custom fonts were registered. Chart text might not render correctly.');
-  console.warn('[MyAgentLogic] WARN: Please ensure font files exist in src/assets/fonts/ and filenames (case-sensitive) are exact.');
+  console.warn('🚫 No custom fonts registered. Charts may use fallback fonts.');
 }
 // --- End Register Custom Fonts ---
 
-console.log('Custom Agent Task Logic Loaded - Now with Chart.js and Multiple Font Weights!');
+console.log('💡 Custom task logic ready (Chart.js & fonts)!');
 
 interface ChartInputDataPoint {
   month?: string; // Example, make this more generic or typed based on chartType
@@ -89,8 +86,15 @@ interface ChartOutputContent {
  * YOUR CUSTOM LOGIC: Create a new task (generate a chart).
  */
 export async function createTask(payload: Partial<Task> & { input: Message }, baseUrl: string): Promise<Task> {
-  console.log('[MyAgentLogic] createTask called with payload:', JSON.stringify(payload, null, 2));
-  console.log(`[MyAgentLogic] Using baseUrl: ${baseUrl}`);
+  const taskName = payload.name || `Chart Task ${Date.now()}`;
+  // Safely access chartType after checking part type
+  let chartTypeDisplay = 'Unknown';
+  if (payload.input?.parts?.[0]?.type === 'data') {
+    const firstPart = payload.input.parts[0] as DataPart; // Cast to DataPart
+    chartTypeDisplay = firstPart.data?.chartType || 'Data (type unspecified)';
+  }
+  console.log(`🚀 New task: "${taskName}" (Input Type: ${chartTypeDisplay})`);
+  console.log(`   🌍 Base URL for links: ${baseUrl}`);
   const taskId = `agent-task-${Date.now()}`;
   const now = new Date().toISOString();
 
@@ -113,7 +117,7 @@ export async function createTask(payload: Partial<Task> & { input: Message }, ba
       throw new Error('Missing required fields (chartType, data) in input data part.');
     }
     const { chartType, data, options = {} } = inputContent;
-    console.log(`[MyAgentLogic] Processing chart generation for type: ${chartType}`);
+    console.log(`   ⚙️ Generating '${chartType}' chart...`);
 
     const canvasWidth = options.width || 800; // Default width
     const canvasHeight = options.height || 600; // Default height
@@ -208,12 +212,12 @@ export async function createTask(payload: Partial<Task> & { input: Message }, ba
     const outputDir = path.dirname(chartFilePath); // This will be chartsDir_logic
 
     if (!fs.existsSync(outputDir)) {
-        console.warn(`[MyAgentLogic] Output directory ${outputDir} was expected to exist but was not found. Attempting to create it.`);
+        console.warn(`   ⚠️ Output dir missing. Creating: ${outputDir}`);
         try {
             fs.mkdirSync(outputDir, { recursive: true });
-            console.log(`[MyAgentLogic] Successfully created output directory: ${outputDir}`);
+            console.log(`   ✅ Output dir created: ${outputDir}`);
         } catch (mkdirError: any) {
-            console.error(`[MyAgentLogic] CRITICAL: Failed to create output directory ${outputDir}. Error: ${mkdirError.message}`);
+            console.error(`   ❌ CRITICAL: Failed to create dir ${outputDir}: ${mkdirError.message}`);
             // Rethrow to ensure the task fails if we can't create the directory.
             // The main try/catch block in createTask will handle this.
             throw mkdirError; 
@@ -222,10 +226,10 @@ export async function createTask(payload: Partial<Task> & { input: Message }, ba
     // --- End ensure output directory ---
 
     fs.writeFileSync(chartFilePath, buffer);
-    console.log(`[MyAgentLogic] Chart image saved to: ${chartFilePath}`);
+    console.log(`   🖼️ Chart saved: ${path.basename(chartFilePath)}`);
     
     const chartImageUrl = `${baseUrl}/charts/${chartFilename}`; 
-    console.log(`[MyAgentLogic] Chart accessible at: ${chartImageUrl}`);
+    console.log(`   🔗 Chart URL: ${chartImageUrl}`);
 
     const outputData: ChartOutputContent = { chartImage: chartImageUrl };
     const resultPart: DataPart = { type: 'data', mimeType: 'application/json', data: outputData };
@@ -233,7 +237,7 @@ export async function createTask(payload: Partial<Task> & { input: Message }, ba
     taskStatus = 'completed';
 
   } catch (error: any) {
-    console.error('[MyAgentLogic] Error during task processing:', error.message);
+    console.error(`🔥 Task error ("${taskName}"): ${error.message}`);
     console.error(error.stack); // Log stack for more details
     taskStatus = 'failed';
     const errorOutput: ChartOutputContent = { errorMessage: error.message };
@@ -252,7 +256,8 @@ export async function createTask(payload: Partial<Task> & { input: Message }, ba
     result: taskResult,
   };
   
-  console.log('[MyAgentLogic] Task finalized:', JSON.stringify(task, null, 2));
+  const statusEmoji = taskStatus === 'completed' ? '✅' : taskStatus === 'failed' ? '❌' : '⏳';
+  console.log(`🏁 Task ${statusEmoji} ${task.status}: "${task.name}" (ID: ${task.id})`);
   return task;
 }
 
@@ -260,7 +265,7 @@ export async function createTask(payload: Partial<Task> & { input: Message }, ba
  * YOUR CUSTOM LOGIC: Get a task by ID.
  */
 export async function getTask(id: string): Promise<Task | undefined> {
-  console.log('[MyAgentLogic] getTask called for ID:', id);
+  console.log(`🔍 Get task: ${id}`);
   // TODO: Implement your actual logic to retrieve a task (e.g., from a database)
   // For now, if createTask is the only way to create tasks, they are not stored persistently here.
   return undefined; // Placeholder unless you implement storage
@@ -270,7 +275,7 @@ export async function getTask(id: string): Promise<Task | undefined> {
  * YOUR CUSTOM LOGIC: Add a message to a task.
  */
 export async function addMessageToTask(id: string, message: Message): Promise<Task | undefined> {
-  console.log('[MyAgentLogic] addMessageToTask for ID:', id, 'Message:', message);
+  console.log(`💬 Add message to task: ${id}`);
   // TODO: Implement if your chart agent supports interactive updates or conversational refinement.
   // This would involve retrieving the task, updating it based on the message, 
   // potentially re-generating the chart, and saving the updated task.
@@ -281,7 +286,7 @@ export async function addMessageToTask(id: string, message: Message): Promise<Ta
  * YOUR CUSTOM LOGIC: Cancel a running task.
  */
 export async function cancelTask(id: string): Promise<Task | undefined> {
-  console.log('[MyAgentLogic] cancelTask for ID:', id);
+  console.log(`🛑 Cancel task: ${id}`);
   // TODO: Implement cancellation if your chart generation is a long-running process
   // that can be interrupted (e.g., update task status to 'canceled' in a database).
   return undefined; // Placeholder
@@ -291,7 +296,7 @@ export async function cancelTask(id: string): Promise<Task | undefined> {
  * YOUR CUSTOM LOGIC: List all tasks.
  */
 export async function listTasks(): Promise<Task[]> {
-  console.log('[MyAgentLogic] listTasks called');
+  console.log('📋 List tasks');
   // TODO: Implement your actual logic to list tasks (e.g., from a database)
   return []; // Placeholder
 } 

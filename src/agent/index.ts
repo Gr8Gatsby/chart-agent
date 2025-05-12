@@ -26,7 +26,7 @@ const chartsDir = path.join(projectRootDir, 'public', 'generated_charts');
 // Ensure the directory for generated charts exists
 if (!fs.existsSync(chartsDir)) {
   fs.mkdirSync(chartsDir, { recursive: true });
-  console.log(`Created directory for generated charts: ${chartsDir}`);
+  console.log(`🚀 Charts directory ready: ${chartsDir}`);
 }
 // --- End setup --- 
 
@@ -34,13 +34,13 @@ if (!fs.existsSync(chartsDir)) {
 // Provide a dummy endpoint for validation as it will be set dynamically later.
 const tempValidationCard = { ...agentCardTemplate, endpoint: 'http://localhost/.well-known/agent.json' };
 if (!validateAgentCard(tempValidationCard)) {
-  console.error('Error: src/agent/agent.json is not a valid Agent Card according to @core/a2a validation.');
-  console.error('Please check its structure against the A2A specification and @core/a2a/src/types.ts AgentCard definition.');
+  console.error('❌ Invalid Agent Card: src/agent/agent.json.');
+  console.error('   Please check its structure against A2A specification and @core/a2a/src/types.ts AgentCard definition.');
   process.exit(1); // Exit if card is invalid
 }
 
-console.log('Agent card from src/agent/agent.json validated successfully.');
-console.log('Agent starting with custom A2A handler wiring...');
+console.log('✅ Agent card validated: src/agent/agent.json');
+console.log('🧩 Agent starting with custom A2A handlers...');
 
 const app = express();
 app.use(express.json()); // Middleware to parse JSON bodies, important for A2A
@@ -48,7 +48,7 @@ app.use(express.json()); // Middleware to parse JSON bodies, important for A2A
 // Serve static files (the generated charts)
 // Files in `public/generated_charts` will be available under `/charts` URL path
 app.use('/charts', express.static(chartsDir));
-console.log(`Serving static charts from ${chartsDir} at /charts`);
+console.log(`🖼️ Serving charts from ${chartsDir} at /charts`);
 
 // Create A2A handlers using your custom task logic
 // We will wrap the createTask to inject the base URL needed for chartImage URL
@@ -112,9 +112,9 @@ export default app;
 if (process.env.RUN_LOCAL_SERVER === 'true') {
   const PORT = parseInt(process.env.PORT || '3001', 10);
   app.listen(PORT, () => {
-    console.log(`Minimal Agent listening locally on port ${PORT}`);
-    console.log(`A2A endpoint available at http://localhost:${PORT}/a2a`);
-    console.log(`Agent card available at http://localhost:${PORT}/a2a/.well-known/agent.json`);
-    console.log(`Generated charts will be served from /charts (e.g., http://localhost:${PORT}/charts/filename.png)`);
+    console.log(`👂 Agent listening locally on port ${PORT}`);
+    console.log(`🔗 A2A endpoint: http://localhost:${PORT}/a2a`);
+    console.log(`📇 Agent card: http://localhost:${PORT}/a2a/.well-known/agent.json`);
+    console.log(`📊 Chart examples: http://localhost:${PORT}/charts/your-chart-filename.png`);
   });
 } 
