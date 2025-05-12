@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "src/agent/index.ts",
+      "src": "api/index.mjs",
       "use": "@vercel/node",
       "config": {
         "nodejs": 18 
@@ -12,7 +12,7 @@
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "src/agent/index.ts"
+      "dest": "api/index.mjs"
     }
   ]
 } 
