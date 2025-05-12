@@ -1,0 +1,28 @@
+{
+  "id": "chart-agent-001",
+  "name": "Chart Agent",
+  "description": "This agent creates charts based on provided data and specifications.",
+  "endpoint": null, 
+  "capabilities": [
+    "chart-generation",
+    "data-visualization"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "chartType": { "type": "string", "description": "Type of chart to generate (e.g., bar, line, pie)" },
+      "data": { "type": "array", "items": { "type": "object" }, "description": "Data for the chart" },
+      "options": { "type": "object", "description": "Additional chart options" }
+    },
+    "required": ["chartType", "data"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "chartImage": { "type": "string", "format": "uri", "description": "URL of the generated chart image" },
+      "chartDataUrl": { "type": "string", "format": "uri", "description": "URL to the underlying chart data/specification" }
+    },
+    "required": ["chartImage"]
+  },
+  "version": "0.1.0"
+} 
