@@ -2,9 +2,7 @@
   "name": "minimal-agent",
   "version": "0.1.0",
   "private": true,
-  "engines": { 
-    "node": "18.x"
-  },
+  "type": "module",
   "scripts": {
     "dev": "tsup src/agent/index.ts --out-dir api --format esm --dts --watch --onSuccess \"RUN_LOCAL_SERVER='true' node api/index.mjs\"",
     "build": "tsup src/agent/index.ts --out-dir api --format esm --dts",
