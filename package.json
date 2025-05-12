@@ -6,7 +6,7 @@
     "dev": "tsup src/agent/index.ts --out-dir api --format esm --dts --watch --onSuccess \"RUN_LOCAL_SERVER='true' node api/index.mjs\"",
     "build": "tsup src/agent/index.ts --out-dir api --format esm --dts",
     "start": "RUN_LOCAL_SERVER='true' node api/index.mjs",
-    "vercel-build": "apt-get update && apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev pkg-config && npm install && tsup src/agent/index.ts --out-dir api --format esm --dts",
+    "vercel-build": "tsup src/agent/index.ts --out-dir api --format esm --dts",
     "test": "vitest"
   },
   "dependencies": {
