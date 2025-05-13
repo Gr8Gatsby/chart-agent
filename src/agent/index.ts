@@ -1,11 +1,6 @@
 import express, { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
-// If router.ts default exports, and @core/a2a re-exports it via 'export * from ./router'
-// it might be available as a named export 'default'
-import router from '../core/a2a/src/router';
 
 // A2A Core imports
 import { createHandlers } from '../core/a2a/src/server';
