@@ -1,84 +1,46 @@
 // src/agent/myAgentTaskLogic.ts
 import { Task, Message, TaskStatus, Part, DataPart } from '../core/a2a/src/types';
 import { v4 as uuidv4 } from 'uuid'; // For generating message IDs
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { createCanvas, registerFont } from 'canvas'; // Import from node-canvas
-import { Chart, registerables } from 'chart.js'; // Import Chart.js
-Chart.register(...registerables); // Register all Chart.js components
+import QuickChart from 'quickchart-js'; // Standard default import
 
-// --- Setup file paths for saving charts ---
-const __filename_logic = fileURLToPath(import.meta.url);
-const __dirname_logic = path.dirname(__filename_logic);
-const projectRootDir_logic = path.resolve(__dirname_logic, '..'); 
-const chartsDir_logic = path.join(projectRootDir_logic, 'public', 'generated_charts');
-const fontsDir_logic = path.join(projectRootDir_logic, 'src', 'assets', 'fonts'); // Path to your fonts directory
-console.log('🗺️ Paths configured:');
-console.log(`   📁 Project Root: ${projectRootDir_logic}`);
-console.log(`   🖼️ Charts Output: ${chartsDir_logic}`);
-console.log(`   ✒️ Fonts Directory: ${fontsDir_logic}`);
-// --- End setup ---
+// --- Simple in-memory store for chart data URLs (can store QuickChart URLs now) ---
+const chartDataStore = new Map<string, string>();
 
-// --- Register Custom Fonts ---
-const customFontFamily = 'RobotoCustom'; // The family name you'll use in Chart.js
-const fontFilesToRegister = [
-  { path: path.join(fontsDir_logic, 'Roboto-Regular.ttf'), weight: 'normal' },
-  { path: path.join(fontsDir_logic, 'Roboto-Bold.ttf'), weight: 'bold' },
-  { path: path.join(fontsDir_logic, 'Roboto-Light.ttf'), weight: 'light' }
-];
-
-let fontsRegistered = 0;
-console.log('🎨 Registering custom fonts...');
-fontFilesToRegister.forEach(fontInfo => {
-  console.log(`   ⚙️ Checking for font at: ${fontInfo.path}`); // Log the exact path being checked
-  if (fs.existsSync(fontInfo.path)) {
-    registerFont(fontInfo.path, { family: customFontFamily, weight: fontInfo.weight });
-    console.log(`   ✅ Registered: ${path.basename(fontInfo.path)} (${fontInfo.weight})`);
-    fontsRegistered++;
-  } else {
-    console.warn(`   ⚠️ Font not found: ${path.basename(fontInfo.path)} at ${fontInfo.path}`);
-  }
-});
-
-if (fontsRegistered > 0) {
-  Chart.defaults.font.family = customFontFamily;
-  Chart.defaults.font.size = 12;
-  console.log(`🖌️ Chart.js default font: ${customFontFamily}`);
-} else {
-  console.warn('🚫 No custom fonts registered. Charts may use fallback fonts.');
+// Function to retrieve stored data URL
+export function getChartDataUrl(id: string): string | undefined {
+  return chartDataStore.get(id);
 }
-// --- End Register Custom Fonts ---
 
-console.log('💡 Custom task logic ready (Chart.js & fonts)!');
+const customFontFamily = 'sans-serif';
+
+console.log('💡 Custom task logic ready (using QuickChart.io for SVG generation)!');
 
 interface ChartInputDataPoint {
-  month?: string; // Example, make this more generic or typed based on chartType
-  sales?: number; // Example
+  month?: string;
+  sales?: number;
   category?: string;
   value?: number;
   label?: string;
-  // Add other potential data structures
   [key: string]: any;
 }
 
 interface ChartInputContent {
   chartType: string;
-  data: ChartInputDataPoint[]; 
+  data: ChartInputDataPoint[];
   options?: {
     title?: string;
     xAxisLabel?: string;
     yAxisLabel?: string;
-    width?: number; // Optional: width for the canvas
-    height?: number; // Optional: height for the canvas
-    fontFamily?: string; // Allow specifying font family per chart
-    [key: string]: any; // Allow other chart.js options
+    width?: number;
+    height?: number;
+    fontFamily?: string;
+    [key: string]: any;
   };
 }
 
 interface ChartOutputContent {
-  chartImage?: string; 
-  chartDataUrl?: string; 
+  message?: string;
+  chartRenderUrl?: string; // This will now be a QuickChart URL
   errorMessage?: string;
 }
 
@@ -87,22 +49,20 @@ interface ChartOutputContent {
  */
 export async function createTask(payload: Partial<Task> & { input: Message }, baseUrl: string): Promise<Task> {
   const taskName = payload.name || `Chart Task ${Date.now()}`;
-  // Safely access chartType after checking part type
   let chartTypeDisplay = 'Unknown';
   if (payload.input?.parts?.[0]?.type === 'data') {
-    const firstPart = payload.input.parts[0] as DataPart; // Cast to DataPart
+    const firstPart = payload.input.parts[0] as DataPart;
     chartTypeDisplay = firstPart.data?.chartType || 'Data (type unspecified)';
   }
   console.log(`🚀 New task: "${taskName}" (Input Type: ${chartTypeDisplay})`);
-  console.log(`   🌍 Base URL for links: ${baseUrl}`);
+  // console.log(`   🌍 Base URL for links: ${baseUrl}`); // BaseUrl might be less relevant if QuickChart provides full URLs
+
   const taskId = `agent-task-${Date.now()}`;
   const now = new Date().toISOString();
 
-  let taskStatus: TaskStatus = 'working'; 
+  let taskStatus: TaskStatus = 'working';
   let taskResult: Message | undefined = undefined;
   let inputContent: ChartInputContent | undefined = undefined;
-  const chartFilename = `${taskId}.png`; // Output as PNG
-  const chartFilePath = path.join(chartsDir_logic, chartFilename);
 
   try {
     if (!payload.input || !payload.input.parts || payload.input.parts.length === 0) {
@@ -117,128 +77,86 @@ export async function createTask(payload: Partial<Task> & { input: Message }, ba
       throw new Error('Missing required fields (chartType, data) in input data part.');
     }
     const { chartType, data, options = {} } = inputContent;
-    console.log(`   ⚙️ Generating '${chartType}' chart...`);
+    console.log(`   ⚙️ Generating '${chartType}' chart using QuickChart.io...`);
 
-    const canvasWidth = options.width || 800; // Default width
-    const canvasHeight = options.height || 600; // Default height
-    const canvas = createCanvas(canvasWidth, canvasHeight);
-    const ctx = canvas.getContext('2d');
+    const chartWidth = options.width || 800;
+    const chartHeight = options.height || 600;
+    const effectiveFontFamily = options.fontFamily || customFontFamily;
 
-    const chartFontFamily = options.fontFamily || customFontFamily;
+    const chartJsConfig: any = {
+        type: chartType.toLowerCase(),
+        data: {},
+        options: {
+            responsive: false, // QuickChart handles dimensions
+            animation: false, // Animations not relevant for static image
+            plugins: {
+                title: { display: !!options.title, text: options.title, font: { family: effectiveFontFamily, size: 18, weight: 'bold' } },
+                legend: { labels: { font: { family: effectiveFontFamily } } },
+                tooltip: { bodyFont: { family: effectiveFontFamily }, titleFont: { family: effectiveFontFamily } }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: !!options.yAxisLabel, text: options.yAxisLabel, font: { family: effectiveFontFamily } },
+                    ticks: { font: { family: effectiveFontFamily } }
+                },
+                x: {
+                    title: { display: !!options.xAxisLabel, text: options.xAxisLabel, font: { family: effectiveFontFamily } },
+                    ticks: { font: { family: effectiveFontFamily } }
+                }
+            },
+            ...options // Spread other options from input
+        }
+    };
 
-    if (chartType.toLowerCase() === 'bar') {
-      // Prepare data for Chart.js bar chart
-      const labels = data.map(d => d.label || d.month || d.category || 'Unknown');
-      const values = data.map(d => d.value || d.sales || 0);
-
-      new Chart(ctx as any, { // Use 'as any' for ctx due to potential type mismatches with node-canvas
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
+    if (chartJsConfig.type === 'bar' || chartJsConfig.type === 'line') {
+        chartJsConfig.data.labels = data.map(d => d.label || d.month || d.category || 'Unknown');
+        chartJsConfig.data.datasets = [{
             label: options.title || 'Dataset',
-            data: values,
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            data: data.map(d => d.value || d.sales || 0),
+            backgroundColor: chartJsConfig.type === 'bar' ? 'rgba(75, 192, 192, 0.2)' : undefined,
             borderColor: 'rgba(75, 192, 192, 1)',
-            borderWidth: 1
-          }]
-        },
-        options: {
-          responsive: false, // Important for node-canvas
-          animation: false,  // Important for node-canvas
-          scales: {
-            y: {
-              beginAtZero: true,
-              title: { display: !!options.yAxisLabel, text: options.yAxisLabel, font: { family: chartFontFamily } },
-              ticks: { font: { family: chartFontFamily } }
-            },
-            x: {
-              title: { display: !!options.xAxisLabel, text: options.xAxisLabel, font: { family: chartFontFamily } },
-              ticks: { font: { family: chartFontFamily } }
-            }
-          },
-          plugins: {
-            title: { display: !!options.title, text: options.title, font: { family: chartFontFamily, size: 18, weight: 'bold' } },
-            legend: { labels: { font: { family: chartFontFamily } } },
-            tooltip: { bodyFont: { family: chartFontFamily }, titleFont: { family: chartFontFamily } }
-          }
-        }
-      });
-    } else if (chartType.toLowerCase() === 'line') {
-      const labels = data.map(d => d.label || d.month || d.category || 'Unknown'); // Assuming similar data structure for labels
-      const values = data.map(d => d.value || d.sales || 0); // Assuming similar data structure for values
-
-      new Chart(ctx as any, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: options.title || 'Dataset',
-            data: values,
-            fill: false,
-            borderColor: 'rgb(75, 192, 192)',
-            tension: 0.1
-          }]
-        },
-        options: {
-          responsive: false,
-          animation: false,
-          scales: {
-            y: {
-              beginAtZero: true,
-              title: { display: !!options.yAxisLabel, text: options.yAxisLabel, font: { family: chartFontFamily } },
-              ticks: { font: { family: chartFontFamily } }
-            },
-            x: {
-              title: { display: !!options.xAxisLabel, text: options.xAxisLabel, font: { family: chartFontFamily } },
-              ticks: { font: { family: chartFontFamily } }
-            }
-          },
-          plugins: {
-            title: { display: !!options.title, text: options.title, font: { family: chartFontFamily, size: 18, weight: 'bold' } },
-            legend: { labels: { font: { family: chartFontFamily } } },
-            tooltip: { bodyFont: { family: chartFontFamily }, titleFont: { family: chartFontFamily } }
-          }
-        }
-      });
+            borderWidth: 1,
+            fill: chartJsConfig.type === 'line' ? false : undefined,
+            tension: chartJsConfig.type === 'line' ? 0.1 : undefined,
+        }];
     } else {
-      throw new Error(`Unsupported chartType: ${chartType}. Implemented types: 'bar', 'line'.`);
+        throw new Error(`Unsupported chartType: ${chartType}. Implemented types for direct config: 'bar', 'line'.`);
     }
 
-    // Save canvas to PNG file
-    const buffer = canvas.toBuffer('image/png');
+    const chart = new QuickChart();
+    chart.setConfig(chartJsConfig);
+    chart.setWidth(chartWidth);
+    chart.setHeight(chartHeight);
+    chart.setFormat('svg'); // Specify SVG format
+    // chart.setBackgroundColor('transparent'); // Optional
 
-    // --- Ensure output directory exists ---
-    const outputDir = path.dirname(chartFilePath); // This will be chartsDir_logic
+    // Get the public URL from QuickChart
+    const quickChartUrl = await chart.getShortUrl(); // Using short URL for brevity; getUrl() for full one.
+    // const quickChartUrl = chart.getUrl(); // Alternative for longer, direct URL
 
-    if (!fs.existsSync(outputDir)) {
-        console.warn(`   ⚠️ Output dir missing. Creating: ${outputDir}`);
-        try {
-            fs.mkdirSync(outputDir, { recursive: true });
-            console.log(`   ✅ Output dir created: ${outputDir}`);
-        } catch (mkdirError: any) {
-            console.error(`   ❌ CRITICAL: Failed to create dir ${outputDir}: ${mkdirError.message}`);
-            // Rethrow to ensure the task fails if we can't create the directory.
-            // The main try/catch block in createTask will handle this.
-            throw mkdirError; 
-        }
+    if (!quickChartUrl) {
+        throw new Error('Failed to generate chart URL from QuickChart.io.');
     }
-    // --- End ensure output directory ---
+    console.log(`   📊 QuickChart.io URL (SVG): ${quickChartUrl}`);
 
-    fs.writeFileSync(chartFilePath, buffer);
-    console.log(`   🖼️ Chart saved: ${path.basename(chartFilePath)}`);
-    
-    const chartImageUrl = `${baseUrl}/charts/${chartFilename}`; 
-    console.log(`   🔗 Chart URL: ${chartImageUrl}`);
+    // Store the QuickChart URL in the in-memory map
+    chartDataStore.set(taskId, quickChartUrl);
+    console.log(`   💾 Stored QuickChart URL in memory for task ID: ${taskId}`);
 
-    const outputData: ChartOutputContent = { chartImage: chartImageUrl };
+    // Return a success message and the QuickChart URL
+    // const renderUrl = `${baseUrl}/charts/${chartFilename}`; // No longer relevant
+    const outputData: ChartOutputContent = {
+      message: 'Chart generated successfully via QuickChart.io.',
+      chartRenderUrl: quickChartUrl
+    };
     const resultPart: DataPart = { type: 'data', mimeType: 'application/json', data: outputData };
     taskResult = { id: uuidv4(), role: 'agent', parts: [resultPart] };
     taskStatus = 'completed';
 
   } catch (error: any) {
     console.error(`🔥 Task error ("${taskName}"): ${error.message}`);
-    console.error(error.stack); // Log stack for more details
+    console.error(error.stack);
     taskStatus = 'failed';
     const errorOutput: ChartOutputContent = { errorMessage: error.message };
     const errorPart: DataPart = { type: 'data', mimeType: 'application/json', data: errorOutput };
@@ -252,51 +170,71 @@ export async function createTask(payload: Partial<Task> & { input: Message }, ba
     updatedAt: new Date().toISOString(),
     input: payload.input,
     name: payload.name || `Chart Task ${taskId}`,
-    description: payload.description || `Generates a ${inputContent?.chartType || 'chart'}`,
+    description: payload.description || `Generates a ${inputContent?.chartType || 'chart'} viewable at ${chartDataStore.get(taskId) || 'a QuickChart URL'}`, // Updated description
     result: taskResult,
+    // Any other fields from payload that should be preserved
+    ...(payload.endpoint && { endpoint: payload.endpoint }),
+    ...(payload.progress && { progress: payload.progress }),
+    ...(payload.parentId && { parentId: payload.parentId }),
+    ...(payload.children && { children: payload.children }),
+    ...(payload.metadata && { metadata: payload.metadata }),
   };
-  
-  const statusEmoji = taskStatus === 'completed' ? '✅' : taskStatus === 'failed' ? '❌' : '⏳';
-  console.log(`🏁 Task ${statusEmoji} ${task.status}: "${task.name}" (ID: ${task.id})`);
   return task;
 }
 
 /**
- * YOUR CUSTOM LOGIC: Get a task by ID.
+ * YOUR CUSTOM LOGIC: Get a specific task by ID.
  */
 export async function getTask(id: string): Promise<Task | undefined> {
-  console.log(`🔍 Get task: ${id}`);
-  // TODO: Implement your actual logic to retrieve a task (e.g., from a database)
-  // For now, if createTask is the only way to create tasks, they are not stored persistently here.
-  return undefined; // Placeholder unless you implement storage
+  // This is a placeholder. You'll need to implement actual task retrieval logic,
+  // potentially from a database or an in-memory store if tasks are managed within this agent.
+  // For now, it returns undefined as if the task is not found.
+  console.log(`🔎 Getting task by ID: ${id}`);
+  // Example: If you were storing tasks in a Map called 'allTasks'
+  // return allTasks.get(id);
+  return undefined;
 }
 
 /**
- * YOUR CUSTOM LOGIC: Add a message to a task.
+ * YOUR CUSTOM LOGIC: Add a message to a task (e.g., user feedback or new instructions).
  */
 export async function addMessageToTask(id: string, message: Message): Promise<Task | undefined> {
-  console.log(`💬 Add message to task: ${id}`);
-  // TODO: Implement if your chart agent supports interactive updates or conversational refinement.
-  // This would involve retrieving the task, updating it based on the message, 
-  // potentially re-generating the chart, and saving the updated task.
-  return undefined; // Placeholder
+  console.log(`💬 Adding message to task ID: ${id}`, message);
+  // Placeholder: Implement logic to find the task and add the message.
+  // This might involve updating the task's message history or re-evaluating the task.
+  const task = await getTask(id); // Example: retrieve the task
+  if (task) {
+    // task.messages.push(message); // Example: if tasks have a messages array
+    task.updatedAt = new Date().toISOString();
+    // Potentially update task status or result based on the new message
+    // await saveTask(task); // Example: persist changes
+    return task;
+  }
+  return undefined;
 }
 
 /**
  * YOUR CUSTOM LOGIC: Cancel a running task.
  */
 export async function cancelTask(id: string): Promise<Task | undefined> {
-  console.log(`🛑 Cancel task: ${id}`);
-  // TODO: Implement cancellation if your chart generation is a long-running process
-  // that can be interrupted (e.g., update task status to 'canceled' in a database).
-  return undefined; // Placeholder
+  console.log(`🛑 Cancelling task ID: ${id}`);
+  const task = await getTask(id); // Example: retrieve the task
+  // Ensure task status is one that can be cancelled, e.g., 'in_progress' or 'submitted'
+  if (task && (task.status === 'in_progress' || task.status === 'submitted')) {
+    task.status = 'canceled'; // Corrected to match TaskStatus type
+    task.updatedAt = new Date().toISOString();
+    // await saveTask(task); // Example: persist changes
+    return task;
+  }
+  return undefined;
 }
 
 /**
- * YOUR CUSTOM LOGIC: List all tasks.
+ * YOUR CUSTOM LOGIC: List all tasks (potentially with filtering/pagination).
  */
 export async function listTasks(): Promise<Task[]> {
-  console.log('📋 List tasks');
-  // TODO: Implement your actual logic to list tasks (e.g., from a database)
-  return []; // Placeholder
+  console.log('📋 Listing all tasks');
+  // Placeholder: Implement logic to retrieve all tasks.
+  // Example: return Array.from(allTasks.values());
+  return [];
 } 

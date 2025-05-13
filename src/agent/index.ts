@@ -2,6 +2,7 @@ import express, { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 // If router.ts default exports, and @core/a2a re-exports it via 'export * from ./router'
 // it might be available as a named export 'default'
 import router from '../core/a2a/src/router';
@@ -17,16 +18,21 @@ import agentCardTemplate from './agent.json'; // Import the agent card
 import { validateAgentCard } from '../core/a2a/src/agentCard'; // Import validation function
 
 // --- Setup file paths and directories --- 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// Project root is two levels up from src/agent/index.ts
-const projectRootDir = path.resolve(__dirname, '..', '..'); 
-const chartsDir = path.join(projectRootDir, 'public', 'generated_charts');
+// Log the current working directory
+console.log(`[Server Setup] Current working directory (process.cwd()): ${process.cwd()}`);
 
-// Ensure the directory for generated charts exists
+// Define paths relative to the project root (process.cwd())
+const chartsDir = path.join('public', 'generated_charts');
+
+// Add this log to verify the absolute path Express *should* resolve from the relative path
+console.log(`[Server Setup] Expecting to serve static files from absolute path: ${path.resolve(chartsDir)}`); 
+
+// Ensure the directory for generated charts exists (using relative path)
 if (!fs.existsSync(chartsDir)) {
   fs.mkdirSync(chartsDir, { recursive: true });
-  console.log(`🚀 Charts directory ready: ${chartsDir}`);
+  console.log(`🚀 Charts directory ready at relative path: ${chartsDir} (absolute: ${path.resolve(chartsDir)})`);
+} else {
+  console.log(`[Server Setup] Charts directory already exists at relative path: ${chartsDir} (absolute: ${path.resolve(chartsDir)})`);
 }
 // --- End setup --- 
 
@@ -45,10 +51,56 @@ console.log('🧩 Agent starting with custom A2A handlers...');
 const app = express();
 app.use(express.json()); // Middleware to parse JSON bodies, important for A2A
 
-// Serve static files (the generated charts)
-// Files in `public/generated_charts` will be available under `/charts` URL path
-app.use('/charts', express.static(chartsDir));
-console.log(`🖼️ Serving charts from ${chartsDir} at /charts`);
+// --- UNCOMMENT OLD STATIC FILE SERVING for /charts ---
+// Serve static files (the generated charts) using the relative path
+const staticMiddleware = express.static(chartsDir, {
+  // Optional: Add event listeners for debugging
+  setHeaders: (res, path, stat) => {
+    console.log(`[Static Serve] Setting headers for: ${path}`);
+  }
+});
+
+app.use('/charts', (req, res, next) => {
+  console.log(`[Static Serve] Request for: ${req.originalUrl}`);
+  
+  // --- BEGIN Enhanced Debugging ---
+  // Calculate the potential *relative* file path based on the request URL
+  const requestedFileRelative = req.path.substring(1); // Remove leading '/'
+  // Calculate the absolute path that *should* correspond to the file
+  const potentialFilePathAbsolute = path.resolve(chartsDir, requestedFileRelative);
+  console.log(`[Static Serve] Checking for file at absolute path: ${potentialFilePathAbsolute}`);
+
+  // Check if the file actually exists using the absolute path for certainty in logging
+  if (fs.existsSync(potentialFilePathAbsolute)) {
+    console.log(`[Static Serve] ✅ File exists: ${potentialFilePathAbsolute}`);
+  } else {
+    console.log(`[Static Serve] ❌ File NOT found: ${potentialFilePathAbsolute}`);
+    // Optionally, list directory contents for debugging using the absolute path
+    const absoluteChartsDir = path.resolve(chartsDir);
+    try {
+      const dirContents = fs.readdirSync(absoluteChartsDir);
+      console.log(`[Static Serve] Contents of ${absoluteChartsDir}:`, dirContents);
+    } catch (dirErr) {
+      console.error(`[Static Serve] Error reading directory ${absoluteChartsDir}:`, dirErr);
+    }
+  }
+  // --- END Enhanced Debugging ---
+  
+  // Pass the request to the express.static middleware (which uses the relative chartsDir)
+  staticMiddleware(req, res, (err) => {
+    if (err) {
+      console.error(`[Static Serve] Error serving ${req.originalUrl}:`, err);
+    }
+    // If staticMiddleware doesn't handle it (e.g., file not found by it, or an error occurs),
+    // call the original next() from Express.
+    // We added our own file existence check above for debugging, but express.static does its own check.
+    console.log(`[Static Serve] Handing off to next() for ${req.originalUrl}`); 
+    next(err); 
+  });
+});
+
+console.log(`🖼️ Serving charts from public/generated_charts at /charts`);
+// --- END UNCOMMENT ---
 
 // Create A2A handlers using your custom task logic
 // We will wrap the createTask to inject the base URL needed for chartImage URL
@@ -115,6 +167,6 @@ if (process.env.RUN_LOCAL_SERVER === 'true') {
     console.log(`👂 Agent listening locally on port ${PORT}`);
     console.log(`🔗 A2A endpoint: http://localhost:${PORT}/a2a`);
     console.log(`📇 Agent card: http://localhost:${PORT}/a2a/.well-known/agent.json`);
-    console.log(`📊 Chart examples: http://localhost:${PORT}/charts/your-chart-filename.png`);
+    console.log(`📊 Chart viewer example: http://localhost:${PORT}/charts/<TASK_ID>`);
   });
 } 
