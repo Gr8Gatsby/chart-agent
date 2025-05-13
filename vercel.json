@@ -4,8 +4,5 @@
     "api/*.js": {
       "runtime": "@vercel/node@4.0.0"
     }
-  },
-  "ignore": [
-    "src/core/**"
-  ]
+  }
 }
