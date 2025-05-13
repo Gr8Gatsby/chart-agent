@@ -1,5 +1,4 @@
 # Chart Generation Agent for Vercel
-.
 
 This project is a minimal agent designed for deployment on Vercel. It utilizes Chart.js and node-canvas to dynamically generate chart images based on A2A (Agent-to-Agent) task requests. It supports custom fonts for consistent chart rendering.
 
